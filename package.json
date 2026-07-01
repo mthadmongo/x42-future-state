@@ -1,0 +1,24 @@
+{
+  "name": "x42-healthcare-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Healthcare patient agent demo on MongoDB (claims, prescriptions, coverage) with semantic caching and intent routing.",
+  "scripts": {
+    "healthcheck": "tsx scripts/healthcheck.ts",
+    "seed": "tsx scripts/seed.ts",
+    "verify-data": "tsx scripts/verify-data.ts",
+    "create-indexes": "tsx scripts/create-indexes.ts",
+    "verify-indexes": "tsx scripts/verify-indexes.ts"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^9.0.0",
+    "dotenv": "^16.4.5",
+    "mongodb": "^6.10.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}
