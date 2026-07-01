@@ -4,6 +4,14 @@
 > the agreed-upon plan for how we generate sample data, load it into MongoDB, and
 > build the agent. Nothing here is final — it's meant to be argued with.
 
+### Decisions locked in (Update 5) — Memory
+- **Short-term (working) memory:** current conversation, per-conversation (recent turns injected into the LLM).
+- **Long-term memory:** new `agent_memory` collection (per patient, cross-conversation), vector-searchable with a `patientId` (+`type`) pre-filter. Types: `preference`, `fact`, `summary`.
+  - **Recall:** always fetch top-K (`MEMORY_TOP_K=5`) via vector search on each miss; inject into the system prompt.
+  - **Formation:** after each *generated* answer (skipped on cache hits), an LLM extractor pulls durable preferences/facts + refreshes a rolling conversation summary; near-duplicates are updated in place (`MEMORY_DEDUPE_THRESHOLD=0.92`).
+  - **Never stores volatile figures** (deductible met, refill counts, balances) — those always come from tools, mirroring the cache's volatile-intent exclusion.
+  - Rolled on MongoDB (no extra framework). Recall/formation steps appear in the behind-the-scenes trace panel.
+
 ### Decisions locked in (Update 4)
 - **Embeddings go through the Atlas Embedding API** (`https://ai.mongodb.com/v1/embeddings`, Bearer auth,
   `input_type` query/document), **not** direct `api.voyageai.com`. The provided key is an Atlas model API key.

@@ -18,7 +18,8 @@
     "test-cache": "tsx scripts/test-cache.ts",
     "test-agent": "tsx scripts/test-agent.ts",
     "test-intents": "tsx scripts/test-intents.ts",
-    "test-integration": "tsx scripts/test-integration.ts"
+    "test-integration": "tsx scripts/test-integration.ts",
+    "test-memory": "tsx scripts/test-memory.ts"
   },
   "dependencies": {
     "@faker-js/faker": "^9.0.0",

@@ -11,6 +11,7 @@ const B = "pat_0008";
 async function wipeCache() {
   const db = await getDb();
   await db.collection(COLLECTIONS.semanticCache).deleteMany({ patientId: { $in: [A, B] } });
+  await db.collection(COLLECTIONS.agentMemory).deleteMany({ patientId: { $in: [A, B] } });
 }
 
 async function main() {

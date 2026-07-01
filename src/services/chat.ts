@@ -4,6 +4,7 @@ import { getTurns, appendTurn } from "./history";
 import { touchConversation } from "./conversations";
 import { answerQuestion, type IntentMode } from "./agent";
 import { recordCacheHit, recordCacheMiss } from "./metrics";
+import { recallMemories, formMemories, formatMemoriesForPrompt } from "./memory";
 import { Tracer, type TraceStep } from "../lib/trace";
 
 export interface ChatResponse {
@@ -64,10 +65,12 @@ export async function handleChat(params: {
     };
   }
 
-  // 2. Miss → run the agent grounded in this patient's data
+  // 2. Miss → recall long-term memory, then run the agent grounded in this patient's data
   await recordCacheMiss();
   const history = await getTurns(conversationId);
-  const result = await answerQuestion(patientId, question, history, mode, tracer);
+  const memories = await recallMemories(patientId, question, tracer);
+  const memoryContext = formatMemoriesForPrompt(memories);
+  const result = await answerQuestion(patientId, question, history, mode, tracer, memoryContext);
 
   // 3. Store in cache (volatile intents are skipped) + append history
   await cache.storeForPatient(
@@ -81,6 +84,9 @@ export async function handleChat(params: {
   await appendTurn(conversationId, "human", question);
   await appendTurn(conversationId, "ai", result.answer);
   await touchConversation(conversationId, question);
+
+  // 4. Memory formation — only on generated turns (skipped on cache hits)
+  await formMemories({ patientId, conversationId, question, answer: result.answer, history, tracer });
 
   return {
     answer: result.answer,

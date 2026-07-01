@@ -23,6 +23,17 @@ const indexSpecs = [
       fields: [{ type: "vector", path: VECTOR_FIELDS.intents, numDimensions: DIMS, similarity: "cosine" }],
     },
   },
+  {
+    collection: COLLECTIONS.agentMemory,
+    name: VECTOR_INDEXES.agentMemory,
+    definition: {
+      fields: [
+        { type: "vector", path: VECTOR_FIELDS.agentMemory, numDimensions: DIMS, similarity: "cosine" },
+        { type: "filter", path: "patientId" },
+        { type: "filter", path: "type" },
+      ],
+    },
+  },
 ];
 
 async function ensureCollection(name: string) {

@@ -48,6 +48,7 @@ async function runLlmToolCalling(
   patientId: string,
   question: string,
   history: ChatTurn[],
+  instructions: string,
   tracer?: Tracer,
 ): Promise<{ answer: string; toolsUsed: string[] }> {
   const input: any[] = [...historyToInput(history), { role: "user", content: question }];
@@ -60,7 +61,7 @@ async function runLlmToolCalling(
       `LLM call (tool-calling), Grove ${config.grove.model}`,
       `${tools.length} tools offered, tool_choice=auto`,
     );
-    const resp = await groveRespond({ input, tools, toolChoice: "auto", instructions: SYSTEM_INSTRUCTIONS });
+    const resp = await groveRespond({ input, tools, toolChoice: "auto", instructions });
     const calls = resp.output.filter((o) => o.type === "function_call");
     if (calls.length === 0) {
       answer = groveText(resp);
@@ -85,6 +86,7 @@ async function synthesizeFromData(
   intent: string,
   data: unknown,
   history: ChatTurn[],
+  instructions: string,
   tracer?: Tracer,
 ): Promise<string> {
   const input: any[] = [
@@ -96,7 +98,7 @@ async function synthesizeFromData(
     `LLM synthesis, Grove ${config.grove.model}`,
     "no tools — answer grounded in the routed tool's data",
   );
-  const resp = await groveRespond({ input, instructions: SYSTEM_INSTRUCTIONS });
+  const resp = await groveRespond({ input, instructions });
   return groveText(resp) || "I couldn't produce an answer for that.";
 }
 
@@ -111,7 +113,12 @@ export async function answerQuestion(
   history: ChatTurn[] = [],
   mode: IntentMode = config.agent.intentMode,
   tracer?: Tracer,
+  memoryContext = "",
 ): Promise<AgentResult> {
+  const instructions = memoryContext
+    ? `${SYSTEM_INSTRUCTIONS}\n\n${memoryContext}`
+    : SYSTEM_INSTRUCTIONS;
+
   if (mode === "router") {
     tracer?.info("Intent mode = router", "classify the intent via vector search before answering");
     const match = await classifyIntent(question, tracer);
@@ -124,7 +131,7 @@ export async function answerQuestion(
         `score ${match!.score.toFixed(3)} ≥ ${ROUTER_CONFIDENCE_THRESHOLD}; executing tool directly`,
       );
       const data = await executeTool(match!.intent, patientId, {}, tracer);
-      const answer = await synthesizeFromData(question, match!.intent, data, history, tracer);
+      const answer = await synthesizeFromData(question, match!.intent, data, history, instructions, tracer);
       return {
         answer,
         intent: match!.intent,
@@ -142,7 +149,7 @@ export async function answerQuestion(
         ? `top intent "${match.intent}" scored ${match.score.toFixed(3)} (< ${ROUTER_CONFIDENCE_THRESHOLD}) or needs args`
         : "no intent match",
     );
-    const { answer, toolsUsed } = await runLlmToolCalling(patientId, question, history, tracer);
+    const { answer, toolsUsed } = await runLlmToolCalling(patientId, question, history, instructions, tracer);
     return {
       answer,
       intent: toolsUsed[0],
@@ -155,6 +162,6 @@ export async function answerQuestion(
 
   // LLM mode
   tracer?.info("Intent mode = LLM tool-calling", "the model chooses which tools to call");
-  const { answer, toolsUsed } = await runLlmToolCalling(patientId, question, history, tracer);
+  const { answer, toolsUsed } = await runLlmToolCalling(patientId, question, history, instructions, tracer);
   return { answer, intent: toolsUsed[0], toolsUsed, mode: "llm", routed: false };
 }
