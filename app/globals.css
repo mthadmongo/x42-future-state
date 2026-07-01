@@ -1,0 +1,87 @@
+:root {
+  --bg: #0b1220;
+  --panel: #111c33;
+  --panel-2: #16233f;
+  --border: #22304f;
+  --text: #e6ecf7;
+  --muted: #91a0bd;
+  --accent: #3d8bff;
+  --green: #2ecc71;
+  --amber: #f1c40f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.app-shell { max-width: 960px; margin: 0 auto; padding: 0 20px 48px; }
+
+.app-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+}
+.logo {
+  background: var(--accent); color: white; font-weight: 700;
+  padding: 4px 10px; border-radius: 8px; letter-spacing: 1px;
+}
+.title { font-weight: 600; font-size: 18px; }
+
+h1 { font-size: 22px; }
+.muted { color: var(--muted); }
+
+.patient-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.patient-card {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+  transition: border-color .15s, transform .15s;
+}
+.patient-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.patient-card .name { font-weight: 600; font-size: 16px; }
+.patient-card .meta { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.patient-card .plan { margin-top: 10px; font-size: 13px; color: var(--accent); }
+
+.chat-wrap { display: flex; flex-direction: column; height: 70vh; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.chat-scroll { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; line-height: 1.45; white-space: pre-wrap; }
+.bubble.human { align-self: flex-end; background: var(--accent); color: white; }
+.bubble.ai { align-self: flex-start; background: var(--panel-2); border: 1px solid var(--border); }
+.badge { font-size: 11px; margin-left: 8px; padding: 1px 7px; border-radius: 10px; }
+.badge.cached { background: rgba(46,204,113,.18); color: var(--green); }
+.badge.generated { background: rgba(61,139,255,.18); color: var(--accent); }
+.badge.intent { background: rgba(241,196,15,.16); color: var(--amber); }
+
+.chat-input { display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--border); }
+.chat-input input { flex: 1; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 14px; }
+.chat-input button { padding: 12px 20px; border-radius: 10px; border: none; background: var(--accent); color: white; font-weight: 600; cursor: pointer; }
+.chat-input button:disabled { opacity: .5; cursor: default; }
+
+.back-link { color: var(--muted); text-decoration: none; font-size: 14px; }
+.back-link:hover { color: var(--text); }
+.disclaimer { color: var(--muted); font-size: 12px; margin-top: 10px; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.mode-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.chip {
+  padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--panel); color: var(--muted); cursor: pointer; font-size: 12px;
+}
+.chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+.chip:disabled { opacity: .6; cursor: default; }
+
+.metrics {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px;
+}
+.metrics > div {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px; text-align: center;
+}
+.m-val { display: block; font-size: 20px; font-weight: 700; }
+.m-lbl { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.badges { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.badge.mode { background: rgba(145,160,189,.18); color: var(--muted); }
