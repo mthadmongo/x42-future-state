@@ -4,6 +4,15 @@
 > the agreed-upon plan for how we generate sample data, load it into MongoDB, and
 > build the agent. Nothing here is final — it's meant to be argued with.
 
+### Decisions locked in (Update 2)
+- **Embeddings:** `voyage-4-large`, **1024 dimensions**, **cosine** similarity.
+- **LLM:** Grove gateway (`gpt-5.5`, OpenAI **Responses API**). Verified working, incl. **function/tool calling**.
+- **Semantic cache & vector store:** LangChain MongoDB integration (`@langchain/mongodb`). See §7 for an important caveat about per-patient isolation.
+- **No TTL index** for now (staleness handled by not caching volatile intents — see §7).
+- **Optional collections dropped:** no `conditions`, `allergies`, or `labs`.
+- **Intent router:** build the Vector Search intent router **and** a toggle to switch between it and LLM tool-calling (both paths are now first-class).
+- **Secrets:** connection string + Grove key + Voyage key are kept **out of the repo** (see §9.1).
+
 ## 1. Goal & Scope
 
 Build a demo of a **healthcare chatbot for patients**. A patient picks who they are,
@@ -31,10 +40,11 @@ consistent** data, and a clean end-to-end flow that shows off MongoDB.
 | Concern | Choice | Rationale |
 |---|---|---|
 | App framework | **Next.js (App Router) + TypeScript** | One repo for UI + API routes; TS pairs naturally with Faker.js. |
-| Database | **MongoDB Atlas** | Vector Search requires Atlas (or Atlas CLI local dev). Not available on a plain local `mongod`. |
-| Driver | Official `mongodb` Node driver | `createSearchIndex` support for vector indexes. |
-| Embeddings | **Voyage AI** (`voyage-3-large` or `voyage-3.5`) | Per your request; strong retrieval quality. |
-| LLM | Provider behind an interface (key supplied by you) | Keep it swappable (OpenAI/Anthropic/etc.). |
+| Database | **MongoDB Atlas** (confirmed available) | Vector Search requires Atlas. Not available on a plain local `mongod`. |
+| Orchestration | **LangChain JS** (`langchain`, `@langchain/mongodb`, `@langchain/openai`) | Vector store + semantic cache + chat history building blocks. |
+| Driver | Official `mongodb` Node driver | `createSearchIndex` support for vector indexes (used by loader + LangChain). |
+| Embeddings | **Voyage AI `voyage-4-large`, 1024 dims, cosine** | Per your decision. LangChain `VoyageEmbeddings`. |
+| LLM | **Grove gateway → `gpt-5.5` (OpenAI Responses API)** | Custom `baseURL` + `api-key` header; `useResponsesApi: true`. Tool-calling verified. |
 | Data gen | **Faker.js** + curated code lists (ICD-10 / CPT / NDC subsets) | Realistic-looking, internally consistent records. |
 | UI | React + Tailwind (or shadcn/ui) | Fast, clean demo UI. |
 
@@ -57,10 +67,8 @@ consistent** data, and a clean end-to-end flow that shows off MongoDB.
 - `coverage` — the patient's insurance plan/benefits (deductible, OOP max, copays). Unlocks the best claims questions.
 - `providers` — doctors/pharmacies, shared across patients (many:many → **reference**, cache display fields via extended-reference pattern).
 
-**Optional (nice-to-have, adds realism):**
-- `conditions` — problem list / diagnoses (ICD-10). Claims already reference diagnosis codes.
-- `allergies` — enables prescription-safety questions.
-- `labs` — recent results/vitals.
+**~~Optional collections — DROPPED per decision~~** (no `conditions`, `allergies`, `labs`).
+Diagnosis codes still appear inline on claims for realism, but there is no separate `conditions` collection.
 
 **Agent infrastructure:**
 - `conversations` — per-patient chat history (messages in a separate collection to avoid unbounded arrays; see §3.3).
@@ -79,11 +87,10 @@ consistent** data, and a clean end-to-end flow that shows off MongoDB.
 - **Conversation messages are unbounded** → separate `messages` documents referenced by
   `conversationId`, not a growing array inside one doc (avoids the unbounded-array anti-pattern & 16MB limit).
 - **Internal consistency is the key to a good demo:**
-  - `claim.diagnosisCodes` ⊂ that patient's `conditions`.
+  - `claim.diagnosisCodes` are drawn from a small curated ICD-10 list (inline on the claim; no separate collection).
   - `claim.providerId` and `prescription.prescriberId` point to real `providers`.
   - Claim `patientResponsibility` amounts roll up to the `coverage.deductible.met` / `outOfPocket.met`
     figures, so "how much of my deductible have I met?" is answerable and correct.
-  - `prescription.drug` respects `allergies` (no prescribed drug the patient is allergic to) — good for a safety demo.
 
 ### 3.3 Sketch of key documents (illustrative, not final)
 
@@ -177,7 +184,6 @@ User question ──► [1] Embed query (Voyage)
 - `getCoverageSummary()` / `getDeductibleStatus()`
 - `getPrescriptions()` / `getRefillInfo(rxId)`
 - `getProviderInfo(providerId)`
-- `getConditions()` / `getAllergies()`
 - `generalHealthEducation()` — no patient data, general info (candidate for a **shared** cache; see §7).
 
 ---
@@ -202,10 +208,11 @@ So vector-based intent routing's real advantages are **latency and determinism**
 | **Vector intent router** | Good for in-distribution, weak on novel phrasing | Poor (returns single nearest intent) | Very low (embed + `$vectorSearch`) | Very low | Higher — must curate labeled utterances in `intents` |
 | **Hybrid** | High | Good | low→1 call | Low | Medium |
 
-### Recommendation
-1. **Primary: LLM native tool/function-calling** for choosing which tool(s) to run. It's more robust for healthcare phrasing, handles compound questions ("show my denied claims and my refills"), and is the least code.
-2. **Best Vector Search showcase = the semantic cache** (§7). That's the defensible, high-value MongoDB story.
-3. **Optional demo feature:** a Vector Search intent router (embed query → `$vectorSearch` over `intents` labeled examples → nearest intent). Great for the "look, MongoDB can classify intent" narrative and useful as a cheap pre-router. Ship it behind a toggle, with an LLM fallback when the top intent score is below a confidence threshold.
+### Recommendation (updated — both paths are now first-class, toggle between them)
+1. **LLM native tool/function-calling** for choosing which tool(s) to run — robust for healthcare phrasing and compound questions ("show my denied claims and my refills"). **Verified**: Grove `gpt-5.5` supports Responses-API function calling (returns a `function_call` output with parsed arguments).
+2. **Vector Search intent router**: embed query → `$vectorSearch` over `intents` labeled example utterances → nearest intent, with an LLM fallback when the top score is below a confidence threshold.
+3. A **runtime toggle** (`INTENT_MODE = "llm" | "router"`) switches between the two so we can demo/compare accuracy, latency, and cost side by side.
+4. **Best Vector Search showcase remains the semantic cache** (§7) — that's where the real token savings live.
 
 ---
 
@@ -240,6 +247,34 @@ full EOB documents, formulary, care gaps. Good future extensions, not needed for
 isolation pattern MongoDB Vector Search's `filter` fields are for, and it keeps one
 patient's Q&A from ever surfacing for another patient.
 
+### ⚠️ Important: LangChain's stock semantic cache does NOT do per-patient filtering
+Investigated `@langchain/mongodb`'s `MongoDBAtlasSemanticCache` (and the Python source):
+
+- The built-in cache is **prompt-global**. Its `lookup()` pre-filters **only** on the
+  `llm_string` (model identity) field — there is **no** per-user/per-patient filter.
+- It's a **global LLM cache** (`set_llm_cache` / `new ChatOpenAI({ cache })`) that intercepts
+  **every** LLM call, including our intent-routing calls — not just the final patient answer.
+- MongoDB's own docs warn: *"the semantic cache caches only the input to the LLM… documents
+  retrieved can change between runs, resulting in cache misses."* So it keys on the **full
+  prompt** (with injected patient data), not the patient's **question** — which both pollutes
+  semantic matching and makes isolation depend on data happening to be in the prompt string.
+
+**This conflicts with requirement #4 (per-patient isolation + matching on the question).**
+
+### Decision: use the LangChain MongoDB building blocks, but a question-level cache with a patientId pre-filter
+Two ways to stay within the LangChain integration while getting what we need:
+
+- **Option A (recommended): subclass `MongoDBAtlasSemanticCache`** — override `lookup`/`update`
+  (and the `keyEncoder`) to (a) embed **only the user's question**, and (b) add `patientId`
+  to the stored metadata and to the `preFilter`. Reuses LangChain's vector-store plumbing.
+- **Option B: use `MongoDBAtlasVectorSearch` directly** with a thin custom cache wrapper that
+  does the pre-filtered `$vectorSearch` + threshold check. Most explicit control.
+
+Either way we call the cache **explicitly at the question boundary** (not as a global
+`set_llm_cache`), so intent-routing LLM calls don't pollute the patient cache.
+👉 **This is the main open item I'd like the LangChain docs link for** (esp. JS `keyEncoder`
+semantics and confirming per-user `preFilter` support), so we pick A vs. B with confidence.
+
 ### `semantic_cache` document (proposed)
 ```jsonc
 {
@@ -247,15 +282,15 @@ patient's Q&A from ever surfacing for another patient.
   "patientId": "pat_0001",          // FILTER field (isolation)
   "scope": "patient",                // "patient" | "global"  (see two-tier idea below)
   "queryText": "how much of my deductible is left",
-  "queryEmbedding": [ /* voyage vector */ ],  // VECTOR field
+  "queryEmbedding": [ /* voyage-4-large 1024-dim vector */ ],  // VECTOR field
   "intent": "getDeductibleStatus",  // optional FILTER field
   "answer": "You have $1,150 of your $2,000 deductible remaining.",
   "sourceRefs": ["cov_0001"],        // provenance for debugging/invalidation
-  "embeddingModel": "voyage-3-large",// FILTER — never match across model versions
+  "embeddingModel": "voyage-4-large",// FILTER — never match across model versions
   "createdAt": "...",
   "lastAccessedAt": "...",
-  "hitCount": 0,
-  "expiresAt": "..."                 // TTL index for volatile answers
+  "hitCount": 0
+  // No TTL/expiresAt for now (decision). Staleness handled by not caching volatile intents.
 }
 ```
 
@@ -264,7 +299,7 @@ patient's Q&A from ever surfacing for another patient.
 {
   "fields": [
     { "type": "vector", "path": "queryEmbedding",
-      "numDimensions": 2048, "similarity": "dotProduct" },  // Voyage vectors are normalized → dotProduct (efficient); cosine is a safe alternative
+      "numDimensions": 1024, "similarity": "cosine" },  // voyage-4-large, cosine (per decision)
     { "type": "filter", "path": "patientId" },
     { "type": "filter", "path": "embeddingModel" },
     { "type": "filter", "path": "scope" }
@@ -294,12 +329,11 @@ db.semantic_cache.aggregate([
 - **High similarity threshold.** Healthcare answers embed real numbers; a loose threshold
   could serve a wrong-but-similar answer. Start strict and tune with test queries. A near-miss
   should be a cache miss, not a wrong answer.
-- **Staleness / invalidation.** Cached answers embed data that changes (deductible met,
-  refills remaining). Options, in order of simplicity:
-  1. **TTL** via `expiresAt` (e.g., cache expires quickly for volatile intents).
-  2. **Don't cache volatile intents** (deductible, refill counts) — cache only stable/educational answers.
-  3. **Version stamp**: store a data-version and invalidate the patient's cache entries on any write to their data.
-  For the demo, TTL + skipping the most volatile intents is the pragmatic choice.
+- **Staleness / invalidation (no TTL for now — decision).** Cached answers embed data that
+  changes (deductible met, refills remaining). Since we're not using a TTL index yet, we handle
+  staleness by **not caching volatile intents** (e.g., `getDeductibleStatus`, `getRefillInfo`)
+  and only caching stable/educational answers. (Future options if needed: reintroduce a TTL
+  index, or a data-version stamp that invalidates a patient's entries on writes.)
 - **Two-tier cache (enhancement).** Add a `scope: "global"` tier for **generic, non-PII
   educational** questions ("what is a deductible?") that can be safely shared across all
   patients — filter `scope: "global"` (ignoring patientId) for those. Personalized answers
@@ -312,6 +346,24 @@ db.semantic_cache.aggregate([
 - *Post-filter with `$match`*: computes similarity on everyone's vectors first, slower, and risks accidental cross-patient exposure if mis-wired — rejected in favor of pre-filter.
 
 ---
+
+## 7b. LLM integration (Grove gateway)
+
+Grove is an OpenAI-compatible gateway using the **Responses API**. Verified with live calls:
+
+- **Endpoint:** `POST https://grove-gateway-prod.azure-api.net/grove-foundry-prod/openai/v1/responses`
+- **Auth header:** `api-key: <GROVE_API_KEY>` (Azure APIM style — **not** `Authorization: Bearer`).
+- **Model:** `gpt-5.5`. Request uses `input` (Responses API), response has `output[]` with `message` / `function_call` items.
+- **Tool calling: confirmed working** — supplying `tools` + `tool_choice:"auto"` returned a
+  `function_call` output with correctly parsed `arguments`. This validates the LLM tool-calling path.
+
+**LangChain wiring (planned):** `ChatOpenAI` with
+`configuration: { baseURL: ".../grove-foundry-prod/openai/v1", defaultHeaders: { "api-key": <key> } }`,
+a dummy `apiKey`, and **`useResponsesApi: true`**. `AzureChatOpenAI` is a poor fit (Grove's path
+isn't the standard Azure `deployments/...` shape), so we go with `ChatOpenAI` + custom base URL/header.
+
+> Follow-up to confirm: does Grove also expose `/chat/completions`? (Not required — we'll target
+> the Responses API — but useful to know for library compatibility.)
 
 ## 8. Data Generation & Loading Plan
 
@@ -333,6 +385,23 @@ db.semantic_cache.aggregate([
 
 ## 9. Security / PHI posture (demo)
 
+### 9.1 Secrets handling (kept OUT of the repo)
+All credentials live in a **git-ignored** `.env` (never committed). The repo only contains
+`.env.example` with **variable names and placeholders — no values**:
+
+| Env var | Purpose |
+|---|---|
+| `MONGODB_URI` | Atlas connection string |
+| `GROVE_API_KEY` | Grove LLM gateway key (sent as `api-key` header) |
+| `GROVE_BASE_URL` | `https://grove-gateway-prod.azure-api.net/grove-foundry-prod/openai/v1` |
+| `VOYAGE_API_KEY` | Voyage AI embeddings key |
+
+- `.gitignore` excludes `.env*` (except `.env.example`) and `node_modules`.
+- **Recommendation:** for cloud-agent runs, store these as **Cloud Agent Secrets** (Dashboard →
+  Cloud Agents → Secrets) rather than pasting them, and since the current values were shared in
+  plaintext, consider **rotating** them before/after the demo.
+
+### 9.2 PHI posture
 - All data synthetic — no real PHI.
 - **Per-patient isolation** enforced everywhere: cache pre-filter, history queries, and the
   data the LLM sees are all scoped to the selected patient. No cross-patient context ever
@@ -345,12 +414,18 @@ db.semantic_cache.aggregate([
 
 ## 10. Open Questions / Decisions Needed Before Building
 
-1. **Atlas access** — do we have an Atlas cluster (or Atlas CLI local) with Vector Search? (Required.)
-2. **LLM provider** — which one is the supplied key for (affects tool-calling API)?
-3. **Voyage model + dimensions** — confirm `voyage-3-large` (2048) vs. a smaller/configurable model. Drives `numDimensions` in the index.
-4. **Scope of optional collections** — do we include conditions/allergies/labs, or keep to patients/claims/prescriptions/coverage/providers?
-5. **Intent router** — do we build the optional Vector Search intent router for the demo narrative, or LLM tool-calling only?
-6. **Cache volatility policy** — TTL length and which intents we exclude from caching.
+**Resolved:** Atlas access ✅ · LLM = Grove `gpt-5.5` Responses API (tool-calling verified) ✅ ·
+Voyage `voyage-4-large` 1024-dim cosine ✅ · optional collections dropped ✅ · intent router + toggle ✅ · no TTL ✅.
+
+**Still open:**
+1. **LangChain semantic-cache docs link** — please share it. It decides §7 Option A (subclass
+   `MongoDBAtlasSemanticCache` for a per-patient, question-level pre-filter) vs. Option B (custom
+   wrapper over `MongoDBAtlasVectorSearch`). This is the one item blocking a clean cache design.
+2. **Grove `/chat/completions`?** — confirm whether it's exposed (nice-to-have; we'll target the
+   Responses API + `useResponsesApi: true` regardless).
+3. **Which intents count as "volatile"** and should be excluded from caching (proposed:
+   `getDeductibleStatus`, `getRefillInfo`, `getClaimStatus`). Confirm/adjust.
+4. **Cache similarity threshold** starting value (proposed: conservative cosine ≥ ~0.95, then tune).
 
 ---
 
@@ -361,6 +436,6 @@ db.semantic_cache.aggregate([
 3. Indexes (regular + vector search) creation script.
 4. Patient selection screen + conversation history storage.
 5. Embedding service (Voyage) + semantic cache read/write with pre-filter + threshold.
-6. Tools + LLM orchestration (tool-calling) + grounded answer generation.
-7. (Optional) Vector intent router + toggle.
+6. Tools + LLM orchestration (Grove tool-calling) + grounded answer generation.
+7. Vector Search intent router + `INTENT_MODE` toggle (router ⇄ LLM) with confidence fallback.
 8. Demo polish: "cached vs. generated" badge, deductible question, metrics (hit rate / tokens saved).
