@@ -47,3 +47,13 @@ export const COLLECTIONS = {
   semanticCache: "semantic_cache",
   intents: "intents",
 } as const;
+
+export const VECTOR_INDEXES = {
+  semanticCache: "semantic_cache_vs",
+  intents: "intents_vs",
+} as const;
+
+export const VECTOR_FIELDS = {
+  semanticCache: "queryEmbedding",
+  intents: "embedding",
+} as const;
