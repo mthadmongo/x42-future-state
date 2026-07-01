@@ -49,6 +49,7 @@ export const COLLECTIONS = {
   conversations: "conversations",
   semanticCache: "semantic_cache",
   intents: "intents",
+  metrics: "metrics",
 } as const;
 
 export const VECTOR_INDEXES = {

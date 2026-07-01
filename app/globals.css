@@ -63,3 +63,25 @@ h1 { font-size: 22px; }
 .back-link { color: var(--muted); text-decoration: none; font-size: 14px; }
 .back-link:hover { color: var(--text); }
 .disclaimer { color: var(--muted); font-size: 12px; margin-top: 10px; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.mode-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.chip {
+  padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--panel); color: var(--muted); cursor: pointer; font-size: 12px;
+}
+.chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+.chip:disabled { opacity: .6; cursor: default; }
+
+.metrics {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px;
+}
+.metrics > div {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px; text-align: center;
+}
+.m-val { display: block; font-size: 20px; font-weight: 700; }
+.m-lbl { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.badges { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.badge.mode { background: rgba(145,160,189,.18); color: var(--muted); }
