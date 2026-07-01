@@ -4,6 +4,12 @@
 > the agreed-upon plan for how we generate sample data, load it into MongoDB, and
 > build the agent. Nothing here is final — it's meant to be argued with.
 
+### Decisions locked in (Update 4)
+- **Embeddings go through the Atlas Embedding API** (`https://ai.mongodb.com/v1/embeddings`, Bearer auth,
+  `input_type` query/document), **not** direct `api.voyageai.com`. The provided key is an Atlas model API key.
+  For Plan A, the LangChain `Embeddings` instance will point at this endpoint (custom wrapper around our
+  `voyage` client, or `VoyageEmbeddings` with an overridden base URL). Verified: `voyage-4-large` → 1024 dims.
+
 ### Decisions locked in (Update 3)
 - **Semantic cache = Plan A**: subclass `MongoDBAtlasSemanticCache` (JS) to embed only the question + pre-filter on `patientId`.
 - **Database name: `x42_agent`** — all collections live here.
@@ -51,7 +57,7 @@ consistent** data, and a clean end-to-end flow that shows off MongoDB.
 | Database | **MongoDB Atlas** (confirmed available) | Vector Search requires Atlas. Not available on a plain local `mongod`. |
 | Orchestration | **LangChain JS** (`langchain`, `@langchain/mongodb`, `@langchain/openai`) | Vector store + semantic cache + chat history building blocks. |
 | Driver | Official `mongodb` Node driver | `createSearchIndex` support for vector indexes (used by loader + LangChain). |
-| Embeddings | **Voyage AI `voyage-4-large`, 1024 dims, cosine** | Per your decision. LangChain `VoyageEmbeddings`. |
+| Embeddings | **`voyage-4-large`, 1024 dims, cosine via Atlas Embedding API** | `https://ai.mongodb.com/v1/embeddings` (Bearer, `input_type`). |
 | LLM | **Grove gateway → `gpt-5.5` (OpenAI Responses API)** | Custom `baseURL` + `api-key` header; `useResponsesApi: true`. Tool-calling verified. |
 | Data gen | **Faker.js** + curated code lists (ICD-10 / CPT / NDC subsets) | Realistic-looking, internally consistent records. |
 | UI | React + Tailwind (or shadcn/ui) | Fast, clean demo UI. |

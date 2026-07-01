@@ -6,14 +6,22 @@ interface VoyageEmbeddingResponse {
   detail?: string;
 }
 
+export type VoyageInputType = "query" | "document";
+
 /**
- * Embeds one or more texts via the Voyage AI API. Returns one 1024-dim vector
- * per input (cosine-normalized model output).
+ * Embeds one or more texts via the Atlas Embedding API (Voyage models).
+ * Returns one 1024-dim vector per input (cosine-normalized model output).
+ *
+ * `inputType` optimizes retrieval embeddings. For the semantic cache we compare
+ * question-to-question, so we use a single consistent type for symmetry.
  */
-export async function embed(inputs: string | string[]): Promise<number[][]> {
+export async function embed(
+  inputs: string | string[],
+  inputType: VoyageInputType = "query",
+): Promise<number[][]> {
   const input = Array.isArray(inputs) ? inputs : [inputs];
 
-  const res = await fetch("https://api.voyageai.com/v1/embeddings", {
+  const res = await fetch(`${config.voyage.baseUrl}/embeddings`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -22,6 +30,7 @@ export async function embed(inputs: string | string[]): Promise<number[][]> {
     body: JSON.stringify({
       input,
       model: config.voyage.model,
+      input_type: inputType,
       output_dimension: config.voyage.dimensions,
     }),
   });
@@ -35,7 +44,10 @@ export async function embed(inputs: string | string[]): Promise<number[][]> {
   return json.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
 }
 
-export async function embedOne(text: string): Promise<number[]> {
-  const [vec] = await embed(text);
+export async function embedOne(
+  text: string,
+  inputType: VoyageInputType = "query",
+): Promise<number[]> {
+  const [vec] = await embed(text, inputType);
   return vec;
 }

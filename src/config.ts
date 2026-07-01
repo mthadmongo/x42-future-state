@@ -28,6 +28,8 @@ export const config = {
   },
   voyage: {
     apiKey: required("VOYAGE_API_KEY"),
+    // Atlas-native Voyage embedding endpoint (model API keys route here).
+    baseUrl: optional("VOYAGE_BASE_URL", "https://ai.mongodb.com/v1"),
     model: optional("VOYAGE_MODEL", "voyage-4-large"),
     dimensions: Number(optional("VOYAGE_DIMENSIONS", "1024")),
   },
