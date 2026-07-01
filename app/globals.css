@@ -67,15 +67,22 @@ h1 { font-size: 22px; }
 /* 3-column chat layout: conversations · chat · behind-the-scenes */
 .chat-layout { display: grid; grid-template-columns: 240px 1fr 400px; gap: 16px; align-items: start; }
 
-.rail { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; height: 78vh; overflow-y: auto; }
+.rail { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; height: 78vh; overflow-y: auto; position: sticky; top: 12px; }
 .rail h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 4px 0 10px; }
 .new-convo { width: 100%; padding: 10px; border-radius: 10px; border: 1px dashed var(--accent); background: transparent; color: var(--accent); cursor: pointer; font-weight: 600; margin-bottom: 12px; }
 .new-convo:hover { background: rgba(61,139,255,.1); }
-.convo { padding: 10px; border-radius: 9px; cursor: pointer; border: 1px solid transparent; margin-bottom: 6px; }
+.convo-list { display: flex; flex-direction: column; gap: 6px; }
+/* conversation "tabs" down the left sidebar */
+.convo {
+  padding: 10px 10px 10px 12px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--border); border-left: 3px solid transparent; background: var(--bg);
+  transition: border-color .12s, background .12s;
+}
 .convo:hover { background: var(--panel-2); }
-.convo.active { background: var(--panel-2); border-color: var(--accent); }
+.convo.active { background: var(--panel-2); border-color: var(--accent); border-left-color: var(--accent); }
 .convo .c-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .convo .c-time { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.convo-empty { color: var(--muted); font-size: 12px; padding: 4px 2px; }
 
 /* Behind-the-scenes / query panel */
 .trace { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; height: 78vh; overflow-y: auto; }

@@ -169,16 +169,24 @@ export default function ChatPage({ params }: { params: Promise<{ patientId: stri
       )}
 
       <div className="chat-layout">
-        {/* Conversations rail */}
+        {/* Conversations sidebar (left) */}
         <aside className="rail">
           <button className="new-convo" onClick={newConversation} disabled={busy}>+ New conversation</button>
           <h3>Conversations</h3>
-          {conversations.map((c) => (
-            <div key={c.id} className={`convo ${c.id === activeId ? "active" : ""}`} onClick={() => selectConversation(c.id)}>
-              <div className="c-title">{c.title}</div>
-              <div className="c-time">{new Date(c.updatedAt).toLocaleString()}</div>
-            </div>
-          ))}
+          <div className="convo-list">
+            {conversations.length === 0 && <div className="convo-empty">No conversations yet.</div>}
+            {conversations.map((c) => (
+              <div
+                key={c.id}
+                className={`convo ${c.id === activeId ? "active" : ""}`}
+                onClick={() => selectConversation(c.id)}
+                title={c.title}
+              >
+                <div className="c-title">{c.title}</div>
+                <div className="c-time">{new Date(c.updatedAt).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
         </aside>
 
         {/* Chat */}
