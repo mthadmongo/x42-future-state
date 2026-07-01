@@ -4,6 +4,14 @@
 > the agreed-upon plan for how we generate sample data, load it into MongoDB, and
 > build the agent. Nothing here is final — it's meant to be argued with.
 
+### Decisions locked in (Update 3)
+- **Semantic cache = Plan A**: subclass `MongoDBAtlasSemanticCache` (JS) to embed only the question + pre-filter on `patientId`.
+- **Database name: `x42_agent`** — all collections live here.
+- **Cache similarity threshold: 0.90.**
+- **Grove: Responses API only** (no `/chat/completions`) — confirmed.
+- **Volatile intents excluded from cache:** `getDeductibleStatus`, `getRefillInfo`, `getClaimStatus`.
+- See **`docs/PHASED_PLAN.md`** for the phased, test-as-you-go build plan.
+
 ### Decisions locked in (Update 2)
 - **Embeddings:** `voyage-4-large`, **1024 dimensions**, **cosine** similarity.
 - **LLM:** Grove gateway (`gpt-5.5`, OpenAI **Responses API**). Verified working, incl. **function/tool calling**.
@@ -55,6 +63,8 @@ consistent** data, and a clean end-to-end flow that shows off MongoDB.
 ---
 
 ## 3. Data Model
+
+> **Database:** all collections below live in the **`x42_agent`** database.
 
 ### 3.1 Collections (recommended)
 
@@ -264,16 +274,16 @@ Investigated `@langchain/mongodb`'s `MongoDBAtlasSemanticCache` (and the Python 
 ### Decision: use the LangChain MongoDB building blocks, but a question-level cache with a patientId pre-filter
 Two ways to stay within the LangChain integration while getting what we need:
 
-- **Option A (recommended): subclass `MongoDBAtlasSemanticCache`** — override `lookup`/`update`
+- **✅ Option A (chosen): subclass `MongoDBAtlasSemanticCache`** — override `lookup`/`update`
   (and the `keyEncoder`) to (a) embed **only the user's question**, and (b) add `patientId`
   to the stored metadata and to the `preFilter`. Reuses LangChain's vector-store plumbing.
-- **Option B: use `MongoDBAtlasVectorSearch` directly** with a thin custom cache wrapper that
-  does the pre-filtered `$vectorSearch` + threshold check. Most explicit control.
+- *Contingency:* if the JS class internals don't cleanly permit injecting a `patientId`
+  pre-filter, fall back to wrapping `MongoDBAtlasVectorSearch` directly (still LangChain).
 
-Either way we call the cache **explicitly at the question boundary** (not as a global
-`set_llm_cache`), so intent-routing LLM calls don't pollute the patient cache.
-👉 **This is the main open item I'd like the LangChain docs link for** (esp. JS `keyEncoder`
-semantics and confirming per-user `preFilter` support), so we pick A vs. B with confidence.
+We call the cache **explicitly at the question boundary** (not as a global `set_llm_cache`),
+so intent-routing LLM calls don't pollute the patient cache. Reference: LangChain × MongoDB
+[memory & semantic caching guide](https://www.mongodb.com/docs/atlas/ai-integrations/langchain/memory-semantic-cache/)
+(Python tutorial; we use the equivalent `@langchain/mongodb` JS classes).
 
 ### `semantic_cache` document (proposed)
 ```jsonc
@@ -320,15 +330,15 @@ db.semantic_cache.aggregate([
   }},
   { $project: { answer: 1, intent: 1, score: { $meta: "vectorSearchScore" } } }
 ])
-// Treat as a HIT only if score >= THRESHOLD (start conservative, e.g. ~0.95 cosine-equiv).
+// Treat as a HIT only if score >= 0.90 (chosen threshold; tune from here).
 ```
 
 ### Key design decisions
 - **Pre-filter on `patientId`** (not post-`$match`): faster (filters before similarity) and
   guarantees isolation. Answers containing patient specifics never leak across patients.
-- **High similarity threshold.** Healthcare answers embed real numbers; a loose threshold
-  could serve a wrong-but-similar answer. Start strict and tune with test queries. A near-miss
-  should be a cache miss, not a wrong answer.
+- **Similarity threshold = 0.90 (cosine).** Healthcare answers embed real numbers, so a
+  near-miss should be a cache miss, not a wrong answer. 0.90 is our starting point; we'll tune
+  against a test query set (raise if we see bad hits, lower if hit rate is too low).
 - **Staleness / invalidation (no TTL for now — decision).** Cached answers embed data that
   changes (deductible met, refills remaining). Since we're not using a TTL index yet, we handle
   staleness by **not caching volatile intents** (e.g., `getDeductibleStatus`, `getRefillInfo`)
@@ -362,8 +372,8 @@ Grove is an OpenAI-compatible gateway using the **Responses API**. Verified with
 a dummy `apiKey`, and **`useResponsesApi: true`**. `AzureChatOpenAI` is a poor fit (Grove's path
 isn't the standard Azure `deployments/...` shape), so we go with `ChatOpenAI` + custom base URL/header.
 
-> Follow-up to confirm: does Grove also expose `/chat/completions`? (Not required — we'll target
-> the Responses API — but useful to know for library compatibility.)
+> **Confirmed:** Grove does **not** expose `/chat/completions` — Responses API only. So
+> `useResponsesApi: true` is required (not optional) in the `ChatOpenAI` config.
 
 ## 8. Data Generation & Loading Plan
 
@@ -414,18 +424,12 @@ All credentials live in a **git-ignored** `.env` (never committed). The repo onl
 
 ## 10. Open Questions / Decisions Needed Before Building
 
-**Resolved:** Atlas access ✅ · LLM = Grove `gpt-5.5` Responses API (tool-calling verified) ✅ ·
-Voyage `voyage-4-large` 1024-dim cosine ✅ · optional collections dropped ✅ · intent router + toggle ✅ · no TTL ✅.
+**All resolved.** Atlas ✅ · Grove `gpt-5.5` Responses API, tool-calling verified, no `/chat/completions` ✅ ·
+Voyage `voyage-4-large` 1024-dim cosine ✅ · optional collections dropped ✅ · intent router + toggle ✅ ·
+no TTL ✅ · cache = Plan A (subclass) ✅ · db `x42_agent` ✅ · threshold `0.90` ✅ ·
+volatile intents = `getDeductibleStatus`/`getRefillInfo`/`getClaimStatus` ✅.
 
-**Still open:**
-1. **LangChain semantic-cache docs link** — please share it. It decides §7 Option A (subclass
-   `MongoDBAtlasSemanticCache` for a per-patient, question-level pre-filter) vs. Option B (custom
-   wrapper over `MongoDBAtlasVectorSearch`). This is the one item blocking a clean cache design.
-2. **Grove `/chat/completions`?** — confirm whether it's exposed (nice-to-have; we'll target the
-   Responses API + `useResponsesApi: true` regardless).
-3. **Which intents count as "volatile"** and should be excluded from caching (proposed:
-   `getDeductibleStatus`, `getRefillInfo`, `getClaimStatus`). Confirm/adjust.
-4. **Cache similarity threshold** starting value (proposed: conservative cosine ≥ ~0.95, then tune).
+➡️ Ready to build. See **`docs/PHASED_PLAN.md`**.
 
 ---
 
