@@ -1,6 +1,6 @@
-import { COLLECTIONS, config } from "../src/config.js";
-import { getDb, closeClient } from "../src/lib/mongo.js";
-import { generateData } from "../src/data/generate.js";
+import { COLLECTIONS, config } from "../src/config";
+import { getDb, closeClient } from "../src/lib/mongo";
+import { generateData } from "../src/data/generate";
 
 async function main() {
   console.log(`=== Phase 1 seed → db "${config.mongo.db}" ===\n`);

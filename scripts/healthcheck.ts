@@ -1,7 +1,7 @@
-import { config } from "../src/config.js";
-import { getDb, closeClient } from "../src/lib/mongo.js";
-import { groveRespond, groveText } from "../src/lib/grove.js";
-import { embedOne } from "../src/lib/voyage.js";
+import { config } from "../src/config";
+import { getDb, closeClient } from "../src/lib/mongo";
+import { groveRespond, groveText } from "../src/lib/grove";
+import { embedOne } from "../src/lib/voyage";
 
 type Check = { name: string; ok: boolean; detail: string };
 

@@ -1,5 +1,5 @@
-import { COLLECTIONS, VECTOR_FIELDS, VECTOR_INDEXES, config } from "../src/config.js";
-import { getDb, closeClient } from "../src/lib/mongo.js";
+import { COLLECTIONS, VECTOR_FIELDS, VECTOR_INDEXES, config } from "../src/config";
+import { getDb, closeClient } from "../src/lib/mongo";
 
 const DIMS = config.voyage.dimensions;
 
@@ -62,8 +62,8 @@ async function main() {
     let allReady = true;
     for (const spec of indexSpecs) {
       const idx = (await db.collection(spec.collection).listSearchIndexes().toArray()).find(
-        (i) => i.name === spec.name,
-      );
+        (i: any) => i.name === spec.name,
+      ) as any;
       const status = idx?.status ?? "MISSING";
       const queryable = idx?.queryable === true;
       statuses.push(`${spec.name}=${status}${queryable ? " (queryable)" : ""}`);

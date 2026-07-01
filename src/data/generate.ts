@@ -8,8 +8,8 @@ import type {
   PlanType,
   Prescription,
   Provider,
-} from "../types.js";
-import { CPT, DENIAL_REASONS, DRUGS, ICD10, PHARMACIES, SPECIALTIES } from "./codes.js";
+} from "../types";
+import { CPT, DENIAL_REASONS, DRUGS, ICD10, PHARMACIES, SPECIALTIES } from "./codes";
 
 const SEED = 42;
 const NUM_PATIENTS = 20;

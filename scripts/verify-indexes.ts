@@ -1,5 +1,5 @@
-import { COLLECTIONS, VECTOR_FIELDS, VECTOR_INDEXES, config } from "../src/config.js";
-import { getDb, closeClient } from "../src/lib/mongo.js";
+import { COLLECTIONS, VECTOR_FIELDS, VECTOR_INDEXES, config } from "../src/config";
+import { getDb, closeClient } from "../src/lib/mongo";
 
 const DIMS = config.voyage.dimensions;
 
@@ -29,7 +29,9 @@ async function main() {
     [COLLECTIONS.semanticCache, VECTOR_INDEXES.semanticCache],
     [COLLECTIONS.intents, VECTOR_INDEXES.intents],
   ] as const) {
-    const idx = (await db.collection(name).listSearchIndexes().toArray()).find((i) => i.name === idxName);
+    const idx = (await db.collection(name).listSearchIndexes().toArray()).find(
+      (i: any) => i.name === idxName,
+    ) as any;
     idx?.queryable
       ? pass(`${idxName} on ${name} is queryable (status=${idx.status})`)
       : fail(`${idxName} on ${name} not queryable (status=${idx?.status ?? "MISSING"})`);

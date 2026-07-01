@@ -1,7 +1,7 @@
-import { COLLECTIONS } from "../src/config.js";
-import { getDb, closeClient } from "../src/lib/mongo.js";
-import { generateData } from "../src/data/generate.js";
-import type { Claim, Coverage, Patient, Prescription, Provider } from "../src/types.js";
+import { COLLECTIONS } from "../src/config";
+import { getDb, closeClient } from "../src/lib/mongo";
+import { generateData } from "../src/data/generate";
+import type { Claim, Coverage, Patient, Prescription, Provider } from "../src/types";
 
 const money = (n: number) => Math.round(n * 100) / 100;
 
