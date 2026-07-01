@@ -19,7 +19,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.app-shell { max-width: 960px; margin: 0 auto; padding: 0 20px 48px; }
+.app-shell { max-width: 1200px; margin: 0 auto; padding: 0 20px 48px; }
 
 .app-header {
   display: flex; align-items: center; gap: 12px;
@@ -63,6 +63,36 @@ h1 { font-size: 22px; }
 .back-link { color: var(--muted); text-decoration: none; font-size: 14px; }
 .back-link:hover { color: var(--text); }
 .disclaimer { color: var(--muted); font-size: 12px; margin-top: 10px; }
+
+/* 3-column chat layout: conversations · chat · behind-the-scenes */
+.chat-layout { display: grid; grid-template-columns: 240px 1fr 400px; gap: 16px; align-items: start; }
+
+.rail { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; height: 78vh; overflow-y: auto; }
+.rail h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 4px 0 10px; }
+.new-convo { width: 100%; padding: 10px; border-radius: 10px; border: 1px dashed var(--accent); background: transparent; color: var(--accent); cursor: pointer; font-weight: 600; margin-bottom: 12px; }
+.new-convo:hover { background: rgba(61,139,255,.1); }
+.convo { padding: 10px; border-radius: 9px; cursor: pointer; border: 1px solid transparent; margin-bottom: 6px; }
+.convo:hover { background: var(--panel-2); }
+.convo.active { background: var(--panel-2); border-color: var(--accent); }
+.convo .c-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.convo .c-time { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* Behind-the-scenes / query panel */
+.trace { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; height: 78vh; overflow-y: auto; }
+.trace h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 2px 0 12px; }
+.trace-step { border-left: 2px solid var(--border); padding: 0 0 12px 12px; position: relative; }
+.trace-step::before { content: ""; position: absolute; left: -5px; top: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.trace-step.k-mongo::before { background: var(--green); }
+.trace-step.k-llm::before { background: var(--amber); }
+.trace-step.k-decision::before { background: #b07cff; }
+.trace-step.k-embedding::before { background: #29c7c7; }
+.ts-head { font-size: 12.5px; font-weight: 600; }
+.ts-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-left: 6px; }
+.ts-detail { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.ts-mongo { margin-top: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+.ts-mongo .ns { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--green); margin-bottom: 4px; }
+.ts-mongo pre { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.trace-empty { color: var(--muted); font-size: 13px; }
 
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .mode-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; }

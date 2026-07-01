@@ -1,6 +1,7 @@
 import { COLLECTIONS } from "../config";
 import { getDb } from "../lib/mongo";
 import type { GroveTool } from "../lib/grove";
+import type { Tracer } from "../lib/trace";
 import type { Claim, Coverage, Prescription, Provider } from "../types";
 
 /**
@@ -86,13 +87,22 @@ export const TOOL_NAMES = TOOL_SCHEMAS.map((t) => t.name);
 type ToolArgs = Record<string, any>;
 
 /** Executes a tool, always scoped to the given patientId. Returns JSON-serializable data. */
-export async function executeTool(name: string, patientId: string, args: ToolArgs): Promise<unknown> {
+export async function executeTool(
+  name: string,
+  patientId: string,
+  args: ToolArgs,
+  tracer?: Tracer,
+): Promise<unknown> {
   const db = await getDb();
 
   switch (name) {
     case "getClaims": {
       const filter: any = { patientId };
       if (args.status) filter.status = args.status;
+      tracer?.mongo(
+        { collection: COLLECTIONS.claims, operation: "find", query: filter },
+        `Tool getClaims → query claims`,
+      );
       const claims = await db
         .collection<Claim>(COLLECTIONS.claims)
         .find(filter)
@@ -102,13 +112,20 @@ export async function executeTool(name: string, patientId: string, args: ToolArg
       return { count: claims.length, claims };
     }
     case "getClaimStatus": {
-      const claim = await db
-        .collection<Claim>(COLLECTIONS.claims)
-        .findOne({ _id: args.claimId, patientId } as any);
+      const filter = { _id: args.claimId, patientId };
+      tracer?.mongo(
+        { collection: COLLECTIONS.claims, operation: "findOne", query: filter },
+        `Tool getClaimStatus → look up claim`,
+      );
+      const claim = await db.collection<Claim>(COLLECTIONS.claims).findOne(filter as any);
       return claim ?? { error: `No claim ${args.claimId} found for this patient.` };
     }
     case "getCoverageSummary":
     case "getDeductibleStatus": {
+      tracer?.mongo(
+        { collection: COLLECTIONS.coverage, operation: "findOne", query: { patientId } },
+        `Tool ${name} → query coverage`,
+      );
       const coverage = await db
         .collection<Coverage>(COLLECTIONS.coverage)
         .findOne({ patientId } as any);
@@ -130,12 +147,20 @@ export async function executeTool(name: string, patientId: string, args: ToolArg
     case "getPrescriptions": {
       const filter: any = { patientId };
       if (args.status) filter.status = args.status;
+      tracer?.mongo(
+        { collection: COLLECTIONS.prescriptions, operation: "find", query: filter },
+        "Tool getPrescriptions → query prescriptions",
+      );
       const rx = await db.collection<Prescription>(COLLECTIONS.prescriptions).find(filter).toArray();
       return { count: rx.length, prescriptions: rx };
     }
     case "getRefillInfo": {
       const filter: any = { patientId };
       if (args.drugName) filter.drugName = { $regex: new RegExp(args.drugName, "i") };
+      tracer?.mongo(
+        { collection: COLLECTIONS.prescriptions, operation: "find", query: filter },
+        "Tool getRefillInfo → query prescription refills",
+      );
       const rx = await db
         .collection<Prescription>(COLLECTIONS.prescriptions)
         .find(filter)
@@ -144,16 +169,25 @@ export async function executeTool(name: string, patientId: string, args: ToolArg
       return { count: rx.length, prescriptions: rx };
     }
     case "getProviderInfo": {
+      tracer?.mongo(
+        { collection: COLLECTIONS.claims, operation: "find", query: { patientId } },
+        "Tool getProviderInfo → find providers on claims",
+      );
       const claims = await db.collection<Claim>(COLLECTIONS.claims).find({ patientId }).toArray();
       const patient = await db.collection(COLLECTIONS.patients).findOne({ _id: patientId } as any);
       const providerIds = new Set<string>(claims.map((c) => c.providerId));
       if (patient?.pcpProviderId) providerIds.add(patient.pcpProviderId);
       const query: any = { _id: { $in: [...providerIds] } };
       if (args.specialty) query.specialty = { $regex: new RegExp(args.specialty, "i") };
+      tracer?.mongo(
+        { collection: COLLECTIONS.providers, operation: "find", query: { _id: { $in: `[${providerIds.size} ids]` } } },
+        "Tool getProviderInfo → load provider details",
+      );
       const providers = await db.collection<Provider>(COLLECTIONS.providers).find(query).toArray();
       return { pcpProviderId: patient?.pcpProviderId ?? null, count: providers.length, providers };
     }
     case "generalHealthEducation": {
+      tracer?.decision("Tool generalHealthEducation → no database query (general answer)");
       return {
         note: "No patient-specific data. Answer generally and remind the user this is not medical advice.",
         topic: args.topic ?? null,

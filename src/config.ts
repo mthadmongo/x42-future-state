@@ -46,7 +46,8 @@ export const COLLECTIONS = {
   coverage: "coverage",
   claims: "claims",
   prescriptions: "prescriptions",
-  conversations: "conversations",
+  conversations: "conversations", // conversation metadata (one doc per conversation)
+  conversationMessages: "conversation_messages", // LangChain chat messages, keyed by conversationId
   semanticCache: "semantic_cache",
   intents: "intents",
   metrics: "metrics",

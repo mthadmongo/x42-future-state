@@ -51,9 +51,15 @@ Pick a patient, then ask things like:
 - "Do I have any denied claims?"
 - "How many refills do I have left?"
 
-Toggle **LLM tool-calling** vs **Vector router** in the chat header; watch the **cache hit rate**
-and **estimated tokens saved** in the metrics panel. Ask a paraphrase of an earlier question to
-see a cache hit.
+UI features:
+- **Multiple conversations per patient** — a left sidebar to start a **new conversation** or revisit
+  old ones. Chat history is per-conversation; the semantic cache is shared across a patient's conversations.
+- **Behind-the-scenes panel** — a right-hand panel showing the step-by-step pipeline and the **actual
+  MongoDB queries/aggregations/writes** for each response (e.g., the `$vectorSearch` on `semantic_cache`,
+  the cache hit/miss decision, intent selection, tool queries, and the cache write). Click any answer to
+  view its trace.
+- **Intent mode toggle** (LLM tool-calling vs Vector router) and a **metrics panel** (cache hit rate,
+  hits/misses, estimated tokens saved). Ask a paraphrase of an earlier question to see a cache hit.
 
 ## Verify / test each layer
 
