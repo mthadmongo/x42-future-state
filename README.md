@@ -6,7 +6,7 @@ stored in **MongoDB**. It showcases MongoDB for:
 
 - **Operational data** (patients, providers, coverage, claims, prescriptions) — synthetic, generated with Faker.js.
 - **Semantic cache** (Atlas Vector Search) — per-patient, question-level caching so repeat/paraphrased questions skip the LLM.
-- **Intent routing** (Atlas Vector Search) — classify a question to a tool; toggle between the vector router and LLM tool-calling.
+- **Intent routing** (Atlas Vector Search) — classify a question to an intent, then run that intent's **deterministic tool chain** (from a `tools` registry). Toggle between this vector router and free LLM tool-calling.
 - **Conversation history** — per conversation (multiple conversations per patient).
 - **Long-term memory** (Atlas Vector Search) — per-patient, cross-conversation memory of durable preferences, facts, and conversation summaries; recalled on each question and formed after each generated answer.
 
@@ -21,9 +21,16 @@ See [`docs/SPEC.md`](docs/SPEC.md) for the full design and [`docs/PHASED_PLAN.md
 - **LLM:** Grove gateway `gpt-5.5` (OpenAI **Responses API**, tool-calling).
 
 Request pipeline (`src/services/chat.ts`): semantic cache lookup (pre-filtered by `patientId`)
-→ on miss, recall long-term memory (top-K vector search) → intent (vector router or LLM tool-calling)
-→ patient-scoped MongoDB tools → grounded answer → cache write (volatile intents skipped) →
-conversation history → memory formation (extract durable preferences/facts + refresh summary) → metrics.
+→ on miss, recall long-term memory (top-K vector search) → intent → patient-scoped MongoDB tools →
+grounded answer → cache write (volatile intents skipped) → conversation history →
+memory formation (extract durable preferences/facts + refresh summary) → metrics.
+
+**Intent → tools (deterministic router):** in `router` mode, a vector search classifies the intent,
+then we run that intent's **fixed, ordered tool chain** defined in the `tools` registry collection
+(e.g. `getDeductibleStatus` → `resolvePatientContext` → `getCoverageByPatient` → `computeDeductibleStatus`).
+Params like `claimId`/`drugName` are filled by a small constrained LLM extraction step; the LLM then
+only synthesizes the final answer. Low-confidence classifications fall back to free LLM tool-calling
+(`llm` mode). This makes the cache-miss path more deterministic than letting the model pick tools.
 
 **Memory:** short-term = current conversation (recent turns). Long-term = `agent_memory`
 (per-patient, cross-conversation) storing `preference` / `fact` / `summary` items with embeddings;
@@ -44,7 +51,7 @@ recalled on each question and injected into the prompt. Durable info only — ne
    ```bash
    npm run seed            # patients/providers/coverage/claims/prescriptions
    npm run create-indexes  # vector search indexes (semantic_cache, intents, agent_memory)
-   npm run seed-intents    # embed intent example utterances
+   npm run seed-tools      # tools registry + intent example utterances (with tools[] mappings)
    ```
 
 ## Run
@@ -79,6 +86,8 @@ UI features:
 | `npm run test-cache` | cache hit/paraphrase/isolation/volatile-skip |
 | `npm run test-agent` | tool selection + grounded answers |
 | `npm run test-intents` | intent classification + routing + fallback |
+| `npm run test-tools` | tools registry integrity + deterministic tool-chain execution |
+| `npm run test-params` | LLM parameter extraction (claimId/drugName) |
 | `npm run test-integration` | full pipeline end-to-end + metrics |
 | `npm run test-memory` | long-term memory formation, recall, isolation, dedup, skip-on-hit |
 
