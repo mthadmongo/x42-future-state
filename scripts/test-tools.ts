@@ -1,4 +1,5 @@
 import { seedTools, loadToolDefs, toolsForIntent } from "../src/services/toolRegistry";
+import { runToolChain } from "../src/services/toolChain";
 import { INTENT_TOOLS, TOOL_REGISTRY } from "../src/data/toolDefs";
 import { INTENT_EXAMPLES } from "../src/services/intents";
 import { COLLECTIONS } from "../src/config";
@@ -49,6 +50,37 @@ async function main() {
   doc && JSON.stringify(doc.tools) === JSON.stringify(expected)
     ? pass(`intent docs carry tools[] (e.g. ${sampleIntent} → [${expected.join(", ")}])`)
     : fail(`intent doc tools[] missing/mismatched for ${sampleIntent} (got ${JSON.stringify(doc?.tools)}; run "npm run seed-tools")`);
+
+  // 6. Deterministic chain execution (no LLM) grounded in a known patient's data
+  const P = "pat_0001";
+  const coverage = await db.collection<any>(COLLECTIONS.coverage).findOne({ patientId: P });
+
+  const deductibleChain = await runToolChain("getDeductibleStatus", P);
+  const ds: any = deductibleChain.data.deductibleStatus;
+  deductibleChain.toolsRun.join(",") === "resolvePatientContext,getCoverageByPatient,computeDeductibleStatus"
+    ? pass("getDeductibleStatus ran the full 3-tool chain in order")
+    : fail(`unexpected chain: ${deductibleChain.toolsRun.join(",")}`);
+  ds && ds.deductible?.met === coverage.deductible.met &&
+    ds.deductible?.remaining === Math.round((coverage.deductible.individual - coverage.deductible.met) * 100) / 100
+    ? pass(`computeDeductibleStatus derived correct met/remaining (${ds.deductible.met}/${ds.deductible.remaining})`)
+    : fail(`deductible derivation wrong: ${JSON.stringify(ds?.deductible)}`);
+
+  const claimsChain = await runToolChain("getClaims", P);
+  Array.isArray(claimsChain.data.claims) && (claimsChain.data.claims as any[]).every((c) => c.patientId === P)
+    ? pass(`getClaims chain returned ${(claimsChain.data.claims as any[]).length} claims, all scoped to the patient`)
+    : fail("getClaims chain returned wrong/unscoped data");
+
+  const rxChain = await runToolChain("getPrescriptions", P);
+  Array.isArray(rxChain.data.prescriptions)
+    ? pass(`getPrescriptions chain returned ${(rxChain.data.prescriptions as any[]).length} prescriptions`)
+    : fail("getPrescriptions chain failed");
+
+  // param-requiring tool: findClaimById with an explicit param
+  const aClaim = await db.collection<any>(COLLECTIONS.claims).findOne({ patientId: P });
+  const statusChain = await runToolChain("getClaimStatus", P, { claimId: aClaim._id });
+  (statusChain.data.claim as any)?._id === aClaim._id
+    ? pass(`getClaimStatus chain resolved the claim by id (${aClaim._id})`)
+    : fail(`getClaimStatus chain did not resolve the claim: ${JSON.stringify(statusChain.data.claim)}`);
 
   await closeClient();
   console.log(`\n${failures.length === 0 ? "ALL CHECKS PASSED" : `${failures.length} CHECK(S) FAILED`}`);
