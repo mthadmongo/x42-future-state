@@ -146,7 +146,7 @@ export default function ChatPage({ params }: { params: Promise<{ patientId: stri
   }
 
   return (
-    <section>
+    <section className="chat-page">
       <div className="topbar">
         <Link href="/" className="back-link">← Switch patient</Link>
         <div className="mode-toggle">
