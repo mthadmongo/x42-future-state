@@ -1,7 +1,9 @@
 import { config } from "../config";
 import { groveRespond, groveText, type GroveTool } from "../lib/grove";
 import { TOOL_SCHEMAS, executeTool } from "./tools";
-import { ARG_REQUIRED_INTENTS, ROUTER_CONFIDENCE_THRESHOLD, classifyIntent } from "./intents";
+import { ROUTER_CONFIDENCE_THRESHOLD, classifyIntent } from "./intents";
+import { runToolChain } from "./toolChain";
+import { extractParams } from "./params";
 import type { ChatTurn } from "./history";
 import type { Tracer } from "../lib/trace";
 
@@ -120,33 +122,35 @@ export async function answerQuestion(
     : SYSTEM_INSTRUCTIONS;
 
   if (mode === "router") {
-    tracer?.info("Intent mode = router", "classify the intent via vector search before answering");
+    tracer?.info("Intent mode = router", "classify intent, then run its deterministic tool chain");
     const match = await classifyIntent(question, tracer);
     const confident = match && match.score >= ROUTER_CONFIDENCE_THRESHOLD;
-    const routable = confident && !ARG_REQUIRED_INTENTS.has(match!.intent);
 
-    if (routable) {
+    if (confident) {
       tracer?.decision(
         `Routed to "${match!.intent}"`,
-        `score ${match!.score.toFixed(3)} ≥ ${ROUTER_CONFIDENCE_THRESHOLD}; executing tool directly`,
+        `score ${match!.score.toFixed(3)} ≥ ${ROUTER_CONFIDENCE_THRESHOLD}; running its predefined tool chain`,
       );
-      const data = await executeTool(match!.intent, patientId, {}, tracer);
-      const answer = await synthesizeFromData(question, match!.intent, data, history, instructions, tracer);
+      // Fill any tool params from the question (skips the LLM when none are needed).
+      const params = await extractParams(match!.intent, question, tracer);
+      // Execute the intent's fixed tool chain deterministically (no LLM tool-selection).
+      const chain = await runToolChain(match!.intent, patientId, params, tracer);
+      const answer = await synthesizeFromData(question, match!.intent, chain.data, history, instructions, tracer);
       return {
         answer,
         intent: match!.intent,
-        toolsUsed: [match!.intent],
+        toolsUsed: chain.toolsRun,
         mode: "router",
         intentScore: match!.score,
         routed: true,
       };
     }
 
-    // Low confidence / arg-required → fall back to LLM tool-calling.
+    // Low confidence → fall back to LLM tool-calling.
     tracer?.decision(
       "Router not confident enough → fall back to LLM tool-calling",
       match
-        ? `top intent "${match.intent}" scored ${match.score.toFixed(3)} (< ${ROUTER_CONFIDENCE_THRESHOLD}) or needs args`
+        ? `top intent "${match.intent}" scored ${match.score.toFixed(3)} (< ${ROUTER_CONFIDENCE_THRESHOLD})`
         : "no intent match",
     );
     const { answer, toolsUsed } = await runLlmToolCalling(patientId, question, history, instructions, tracer);

@@ -68,9 +68,6 @@ export const INTENT_EXAMPLES: Record<string, string[]> = {
   ],
 };
 
-/** Tools that require arguments the router can't extract → force LLM fallback. */
-export const ARG_REQUIRED_INTENTS = new Set(["getClaimStatus"]);
-
 export interface IntentMatch {
   intent: string;
   score: number;
