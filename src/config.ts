@@ -36,6 +36,7 @@ export const config = {
   agent: {
     intentMode: optional("INTENT_MODE", "llm") as "llm" | "router",
     cacheSimilarityThreshold: Number(optional("CACHE_SIMILARITY_THRESHOLD", "0.90")),
+    routerConfidenceThreshold: Number(optional("ROUTER_CONFIDENCE_THRESHOLD", "0.80")),
   },
 } as const;
 

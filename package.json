@@ -13,9 +13,12 @@
     "verify-data": "tsx scripts/verify-data.ts",
     "create-indexes": "tsx scripts/create-indexes.ts",
     "verify-indexes": "tsx scripts/verify-indexes.ts",
+    "seed-intents": "tsx scripts/seed-intents.ts",
     "test-history": "tsx scripts/test-history.ts",
     "test-cache": "tsx scripts/test-cache.ts",
-    "test-agent": "tsx scripts/test-agent.ts"
+    "test-agent": "tsx scripts/test-agent.ts",
+    "test-intents": "tsx scripts/test-intents.ts",
+    "test-integration": "tsx scripts/test-integration.ts"
   },
   "dependencies": {
     "@faker-js/faker": "^9.0.0",
