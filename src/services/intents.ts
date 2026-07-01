@@ -3,6 +3,7 @@ import { COLLECTIONS, VECTOR_FIELDS, VECTOR_INDEXES, config } from "../config";
 import { getDb } from "../lib/mongo";
 import { embeddings } from "../lib/embeddings";
 import { Tracer, VECTOR_PLACEHOLDER } from "../lib/trace";
+import { INTENT_TOOLS } from "../data/toolDefs";
 
 /**
  * Labeled example utterances per intent. Each intent maps to a tool name in
@@ -84,8 +85,9 @@ export async function seedIntents(): Promise<number> {
   const docs: Document[] = [];
   for (const [intent, examples] of Object.entries(INTENT_EXAMPLES)) {
     const vectors = await embeddings.embedDocuments(examples);
+    const tools = INTENT_TOOLS[intent] ?? [];
     examples.forEach((text, i) => {
-      docs.push({ intent, text, [VECTOR_FIELDS.intents]: vectors[i] });
+      docs.push({ intent, text, tools, [VECTOR_FIELDS.intents]: vectors[i] });
     });
   }
   await col.insertMany(docs);

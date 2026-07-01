@@ -57,6 +57,7 @@ export const COLLECTIONS = {
   intents: "intents",
   metrics: "metrics",
   agentMemory: "agent_memory", // long-term memory: preferences, facts, conversation summaries
+  tools: "tools", // registry of atomic tools (definitions + sample queries) for the deterministic router
 } as const;
 
 export const VECTOR_INDEXES = {
