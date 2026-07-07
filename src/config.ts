@@ -38,6 +38,11 @@ export const config = {
     cacheSimilarityThreshold: Number(optional("CACHE_SIMILARITY_THRESHOLD", "0.90")),
     routerConfidenceThreshold: Number(optional("ROUTER_CONFIDENCE_THRESHOLD", "0.80")),
   },
+  memory: {
+    topK: Number(optional("MEMORY_TOP_K", "5")),
+    // Above this similarity, a new fact/preference is treated as a duplicate and updated in place.
+    dedupeThreshold: Number(optional("MEMORY_DEDUPE_THRESHOLD", "0.92")),
+  },
 } as const;
 
 export const COLLECTIONS = {
@@ -46,18 +51,23 @@ export const COLLECTIONS = {
   coverage: "coverage",
   claims: "claims",
   prescriptions: "prescriptions",
-  conversations: "conversations",
+  conversations: "conversations", // conversation metadata (one doc per conversation)
+  conversationMessages: "conversation_messages", // LangChain chat messages, keyed by conversationId
   semanticCache: "semantic_cache",
   intents: "intents",
   metrics: "metrics",
+  agentMemory: "agent_memory", // long-term memory: preferences, facts, conversation summaries
+  tools: "tools", // registry of atomic tools (definitions + sample queries) for the deterministic router
 } as const;
 
 export const VECTOR_INDEXES = {
   semanticCache: "semantic_cache_vs",
   intents: "intents_vs",
+  agentMemory: "agent_memory_vs",
 } as const;
 
 export const VECTOR_FIELDS = {
   semanticCache: "queryEmbedding",
   intents: "embedding",
+  agentMemory: "embedding",
 } as const;

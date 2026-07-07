@@ -4,10 +4,10 @@ import { getTurns } from "../../../src/services/history";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const patientId = req.nextUrl.searchParams.get("patientId");
-  if (!patientId) {
-    return NextResponse.json({ error: "patientId is required" }, { status: 400 });
+  const conversationId = req.nextUrl.searchParams.get("conversationId");
+  if (!conversationId) {
+    return NextResponse.json({ error: "conversationId is required" }, { status: 400 });
   }
-  const turns = await getTurns(patientId);
+  const turns = await getTurns(conversationId);
   return NextResponse.json({ turns });
 }

@@ -2,6 +2,8 @@ import type { Document } from "mongodb";
 import { COLLECTIONS, VECTOR_FIELDS, VECTOR_INDEXES, config } from "../config";
 import { getDb } from "../lib/mongo";
 import { embeddings } from "../lib/embeddings";
+import { Tracer, VECTOR_PLACEHOLDER } from "../lib/trace";
+import { INTENT_TOOLS } from "../data/toolDefs";
 
 /**
  * Labeled example utterances per intent. Each intent maps to a tool name in
@@ -66,9 +68,6 @@ export const INTENT_EXAMPLES: Record<string, string[]> = {
   ],
 };
 
-/** Tools that require arguments the router can't extract → force LLM fallback. */
-export const ARG_REQUIRED_INTENTS = new Set(["getClaimStatus"]);
-
 export interface IntentMatch {
   intent: string;
   score: number;
@@ -83,8 +82,9 @@ export async function seedIntents(): Promise<number> {
   const docs: Document[] = [];
   for (const [intent, examples] of Object.entries(INTENT_EXAMPLES)) {
     const vectors = await embeddings.embedDocuments(examples);
+    const tools = INTENT_TOOLS[intent] ?? [];
     examples.forEach((text, i) => {
-      docs.push({ intent, text, [VECTOR_FIELDS.intents]: vectors[i] });
+      docs.push({ intent, text, tools, [VECTOR_FIELDS.intents]: vectors[i] });
     });
   }
   await col.insertMany(docs);
@@ -92,9 +92,30 @@ export async function seedIntents(): Promise<number> {
 }
 
 /** Classifies a question to its nearest intent via vector search. */
-export async function classifyIntent(question: string): Promise<IntentMatch | null> {
+export async function classifyIntent(question: string, tracer?: Tracer): Promise<IntentMatch | null> {
   const db = await getDb();
+  tracer?.embedding(
+    "Embed the question for intent routing",
+    `${config.voyage.model} → ${config.voyage.dimensions}-dim vector`,
+  );
   const queryVector = await embeddings.embedQuery(question);
+
+  const tracedPipeline = [
+    {
+      $vectorSearch: {
+        index: VECTOR_INDEXES.intents,
+        path: VECTOR_FIELDS.intents,
+        queryVector: VECTOR_PLACEHOLDER,
+        numCandidates: 100,
+        limit: 1,
+      },
+    },
+    { $project: { intent: 1, text: 1, score: { $meta: "vectorSearchScore" } } },
+  ];
+  tracer?.mongo(
+    { collection: COLLECTIONS.intents, operation: "aggregate", query: tracedPipeline },
+    "Vector search on intents (nearest labeled utterance)",
+  );
 
   const [match] = await db
     .collection(COLLECTIONS.intents)

@@ -9,25 +9,27 @@ export interface ChatTurn {
 }
 
 /**
- * Per-patient conversation history. The LangChain session id IS the patientId,
- * so history is isolated per patient (requirement #4).
+ * Messages for a single conversation, via LangChain's MongoDBChatMessageHistory.
+ * The session id IS the conversationId (globally unique), stored in
+ * `conversation_messages`. Conversation metadata lives in `conversations`
+ * (see conversations.ts).
  */
-export async function getHistory(patientId: string): Promise<MongoDBChatMessageHistory> {
+export async function getHistory(conversationId: string): Promise<MongoDBChatMessageHistory> {
   const db = await getDb();
   return new MongoDBChatMessageHistory({
-    collection: db.collection(COLLECTIONS.conversations),
-    sessionId: patientId,
+    collection: db.collection(COLLECTIONS.conversationMessages),
+    sessionId: conversationId,
   });
 }
 
-export async function appendTurn(patientId: string, role: "human" | "ai", content: string): Promise<void> {
-  const history = await getHistory(patientId);
+export async function appendTurn(conversationId: string, role: "human" | "ai", content: string): Promise<void> {
+  const history = await getHistory(conversationId);
   const message: BaseMessage = role === "human" ? new HumanMessage(content) : new AIMessage(content);
   await history.addMessage(message);
 }
 
-export async function getTurns(patientId: string): Promise<ChatTurn[]> {
-  const history = await getHistory(patientId);
+export async function getTurns(conversationId: string): Promise<ChatTurn[]> {
+  const history = await getHistory(conversationId);
   const messages = await history.getMessages();
   return messages.map((m) => ({
     role: m.getType() === "human" ? "human" : "ai",
@@ -35,7 +37,7 @@ export async function getTurns(patientId: string): Promise<ChatTurn[]> {
   }));
 }
 
-export async function clearHistory(patientId: string): Promise<void> {
-  const history = await getHistory(patientId);
+export async function clearMessages(conversationId: string): Promise<void> {
+  const history = await getHistory(conversationId);
   await history.clear();
 }
